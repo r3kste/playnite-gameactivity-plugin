@@ -353,6 +353,23 @@ namespace GameActivity
                     Common.LogDebug(Serialization.ToJson(runningActivity.GameActivitiesLog));
                     PluginDatabase.Update(runningActivity.GameActivitiesLog);
 
+                    if (PluginDatabase.PluginSettings.EnableAutoExport)
+                    {
+                        string exportPath = PluginDatabase.PluginSettings.GetAutoExportPath(PluginDatabase.Paths.PluginUserDataPath);
+                        _ = Task.Run(() =>
+                        {
+                            try
+                            {
+                                var autoExport = new GameActivityExport();
+                                autoExport.ExportToCsvFile(exportPath, PluginDatabase.GetListGameActivity());
+                            }
+                            catch (Exception ex)
+                            {
+                                Common.LogError(ex, false, true, PluginDatabase.PluginName);
+                            }
+                        });
+                    }
+
                     if (PluginDatabase.GameContext != null && game.Id == PluginDatabase.GameContext.Id)
                     {
                         PluginDatabase.SetThemesResources(PluginDatabase.GameContext);
