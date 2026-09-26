@@ -1,7 +1,8 @@
 param(
     [string]$ConfigurationName, 
     [string]$OutDir,
-    [string]$SolutionDir 
+    [string]$SolutionDir,
+    [string]$ToolboxPath
 )
 
 $PlaynitePaths = @(
@@ -11,25 +12,29 @@ $PlaynitePaths = @(
     "F:\Playnite_dev", "F:\Projects\Playnite_dev"
 )
 
-$PlaynitePath = $null
+$ResolvedToolboxPath = $ToolboxPath
 
-foreach ($path in $PlaynitePaths) {
-    if (Test-Path -Path $path) {
-        $PlaynitePath = $path
-        break
+if ([string]::IsNullOrWhiteSpace($ResolvedToolboxPath)) {
+    foreach ($path in $PlaynitePaths) {
+        if (Test-Path -Path $path) {
+            $ResolvedToolboxPath = Join-Path $path "toolbox.exe"
+            break
+        }
     }
 }
 
-if ($null -eq $PlaynitePath) {
+if ($null -eq $ResolvedToolboxPath -or -not (Test-Path -Path $ResolvedToolboxPath)) {
     Write-Host "No Playnite path valid found"
 } 
 else {
-    $ToolboxPath = (Join-Path $PlaynitePath "toolbox.exe")
     $OutDirPath = (Join-Path $OutDir "..")
 
     if ($ConfigurationName -eq "debug-release") {
-		if (Test-Path $ToolboxPath) {
-			$string = & $ToolboxPath "pack" $OutDir $OutDirPath
+		if (Test-Path $ResolvedToolboxPath) {
+			$string = & $ResolvedToolboxPath "pack" $OutDir $OutDirPath
+            if ($LASTEXITCODE -ne 0) {
+                throw "Playnite Toolbox failed to pack the extension."
+            }
             Write-Host $string
 
             if ($string -match '"([^"]+)"') {
@@ -66,12 +71,12 @@ else {
         $Result = Get-Content $Manifest
 
         if ($Result -imatch $Version) {
-            if (Test-Path $ToolboxPath) {
-                & $ToolboxPath "pack" $OutDir $OutDirPath
+            if (Test-Path $ResolvedToolboxPath) {
+                & $ResolvedToolboxPath "pack" $OutDir $OutDirPath
 
-                $Result = & $ToolboxPath "verify" "installer" $Manifest
+                $Result = & $ResolvedToolboxPath "verify" "installer" $Manifest
                 if ($Result -imatch "Installer manifest passed verification") {
-                    # Si nécessaire, ajouter des actions ici en cas de réussite
+                    # Si nï¿½cessaire, ajouter des actions ici en cas de rï¿½ussite
                 } else {
                     Write-Host $Result
                 }
