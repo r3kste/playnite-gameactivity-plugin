@@ -13,6 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Windows.Media;
 
@@ -306,6 +307,55 @@ namespace GameActivity
         /// <summary>Default accent colour for chart series that have no store mapping.</summary>
         public SolidColorBrush ChartColors { get; set; } =
             (SolidColorBrush)BrushCache.FromHex("#2195f2");
+
+        #endregion
+
+        #region Auto Export
+
+        /// <summary>Automatically export the activity database to CSV after every completed session.</summary>
+        public bool EnableAutoExport { get; set; } = false;
+
+        /// <summary>Destination CSV path for the auto-export. Leave blank to use the default plugin path.</summary>
+        public string AutoExportPath { get; set; } = string.Empty;
+
+        /// <summary>Returns the effective auto-export path, creating the folder if it does not exist.</summary>
+        public string GetAutoExportPath(string pluginUserDataPath)
+        {
+            string candidatePath = string.IsNullOrWhiteSpace(AutoExportPath)
+                ? string.Empty
+                : AutoExportPath.Trim();
+
+            if (string.IsNullOrWhiteSpace(candidatePath))
+            {
+                string directory = string.IsNullOrWhiteSpace(pluginUserDataPath)
+                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "GameActivity")
+                    : pluginUserDataPath;
+
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                return Path.Combine(directory, "GameActivity_AutoExport.csv");
+            }
+
+            if (!Path.HasExtension(candidatePath))
+            {
+                candidatePath += ".csv";
+            }
+            else if (string.Equals(Path.GetExtension(candidatePath), ".csv", StringComparison.OrdinalIgnoreCase) == false)
+            {
+                candidatePath += ".csv";
+            }
+
+            string exportDirectory = Path.GetDirectoryName(candidatePath);
+            if (!string.IsNullOrEmpty(exportDirectory) && !Directory.Exists(exportDirectory))
+            {
+                Directory.CreateDirectory(exportDirectory);
+            }
+
+            return candidatePath;
+        }
 
         #endregion
 

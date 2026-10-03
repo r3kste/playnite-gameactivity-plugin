@@ -1,0 +1,57 @@
+name: Build Playnite extension
+
+on:
+  push:
+    branches:
+      - master
+      - devel
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Set up NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Restore NuGet packages
+        shell: pwsh
+        run: nuget restore source/GameActivity.sln -NonInteractive
+
+      - name: Download Playnite Toolbox
+        shell: pwsh
+        run: |
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/JosefNemec/Playnite/releases/latest"
+          $asset = $release.assets | Where-Object { $_.name -like "*.7z" } | Select-Object -First 1
+          if ($null -eq $asset) {
+            throw "Could not find a Playnite portable archive in the latest release."
+          }
+
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\toolbox" | Out-Null
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "$env:RUNNER_TEMP\playnite.7z"
+          7z x "$env:RUNNER_TEMP\playnite.7z" -o"$env:GITHUB_WORKSPACE\toolbox" -y
+
+      - name: Build and package extension
+        shell: pwsh
+        run: >-
+          msbuild source/GameActivity.sln
+          /p:Configuration=Debug-Release
+          /p:Platform="Any CPU"
+          /p:ToolboxPath="$env:GITHUB_WORKSPACE\toolbox\toolbox.exe"
+
+      - name: Upload .pext package
+        uses: actions/upload-artifact@v4
+        with:
+          name: playnite-gameactivity-plugin
+          path: source/bin/*.pext
+          if-no-files-found: error
