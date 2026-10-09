@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
 using CommonPluginsShared.Plugins;
 using GameActivity.Models;
 using Playnite.SDK;
@@ -284,6 +287,72 @@ namespace GameActivity.Services
 			row.Add("GpuPower", log?.GPUP.ToString() ?? string.Empty);
 
 			return row;
+		}
+
+		/// <summary>
+		/// Writes the supplied activity records to a CSV file at <paramref name="filePath"/>.
+		/// The file is always overwritten to keep a single, up-to-date session export.
+		/// </summary>
+		public bool ExportToCsvFile(string filePath, IEnumerable<GameActivities> items)
+		{
+			if (string.IsNullOrWhiteSpace(filePath))
+			{
+				return false;
+			}
+
+			string exportDirectory = Path.GetDirectoryName(filePath);
+			if (!string.IsNullOrEmpty(exportDirectory) && !Directory.Exists(exportDirectory))
+			{
+				Directory.CreateDirectory(exportDirectory);
+			}
+
+			var rows = new List<Dictionary<string, string>>();
+			foreach (GameActivities item in items ?? Enumerable.Empty<GameActivities>())
+			{
+				foreach (Dictionary<string, string> row in GetRows(item))
+				{
+					rows.Add(row);
+				}
+			}
+
+			Dictionary<string, string> header = GetHeader();
+			using (var writer = new StreamWriter(filePath, false, Encoding.UTF8))
+			{
+				writer.WriteLine(BuildCsvLine(header.Values));
+				foreach (Dictionary<string, string> row in rows)
+				{
+					var values = new List<string>();
+					foreach (string key in header.Keys)
+					{
+						values.Add(row.ContainsKey(key) ? row[key] : string.Empty);
+					}
+
+					writer.WriteLine(BuildCsvLine(values));
+				}
+			}
+
+			return true;
+		}
+
+		private static string BuildCsvLine(IEnumerable<string> values)
+		{
+			return string.Join(",", values.Select(EscapeCsv));
+		}
+
+		private static string EscapeCsv(string value)
+		{
+			if (value == null)
+			{
+				return string.Empty;
+			}
+
+			string escaped = value.Replace("\"", "\"\"");
+			if (escaped.IndexOf(',') >= 0 || escaped.IndexOf('"') >= 0 || escaped.IndexOf('\n') >= 0 || escaped.IndexOf('\r') >= 0)
+			{
+				return "\"" + escaped + "\"";
+			}
+
+			return escaped;
 		}
 
 		protected string FormatTimeSpan(TimeSpan ts)
